@@ -12,3 +12,7 @@ def aclbibcleaner(bibtex, output, interactive):
     output = output if output else "cleaned_bib.bib"
     cleaner = ACLCleaner(bibtex, output)
     return cleaner.clean()
+
+
+if __name__ == '__main__':
+    aclbibcleaner()
