@@ -1,24 +1,24 @@
 acl-cleaner
 ===========
 
-.. image:: https://img.shields.io/pypi/v/acl-cleaner.svg
+.. image:: https://img.shields.io/pypi/v/acleanbib.svg
     :target: https://pypi.python.org/pypi/acl-cleaner
     :alt: Latest PyPI version
 
-.. image:: https://travis-ci.org/borntyping/cookiecutter-pypackage-minimal.png
-   :target: https://travis-ci.org/borntyping/cookiecutter-pypackage-minimal
-   :alt: Latest Travis CI build status
-
-Python tool for cleaning bibtex to the canonical ACL anthology format.
+Python tool for converting bibtex to the canonical ACL anthology format.
 
 Usage
 -----
 
 Installation
 ------------
+Clone the repository and run `pip install -e .`. You can then run the tool by calling `acleanbib [BIBTEX] [--OUTPUT]`
 
 Requirements
 ^^^^^^^^^^^^
+1. click
+2. bibtexparser
+3. pandas
 
 Compatibility
 -------------
@@ -29,4 +29,4 @@ Licence
 Authors
 -------
 
-`acl-cleaner` was written by `Olamilekan Wahab <olamyy53@gmail.com>`_.
+`acleanbib` was written by `Olamilekan Wahab <olamyy53@gmail.com>`_.

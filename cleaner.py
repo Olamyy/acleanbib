@@ -26,7 +26,7 @@ class ACLCleaner(object):
         self.bibtex = bibtex
         self.output = output
         self.anthology_path = list(Path(os.path.dirname(__file__)).joinpath('data').iterdir())[0]
-        self.bibdata = pandas.read_csv(self.anthology_path, low_memory=False)
+        self.bibdata = pandas.read_csv(self.anthology_path, compression='zip', low_memory=False)
 
     def match_title(self, value):
         m = self.bibdata[self.bibdata.title.str.contains(value, regex=False)]
@@ -34,7 +34,6 @@ class ACLCleaner(object):
 
     def match_authors(self, value, inp=None):
         value = " ".join(value)
-        print(value)
         m = inp[inp.author.str.contains(value, na=False)] if inp is not None else self.bibdata[self.bibdata.author.str.contains(value, na=False)]
         return m
 
@@ -84,3 +83,5 @@ class ACLCleaner(object):
                 writer.align_values = True
                 bibfile.write(writer.write(db))
         return True
+
+
