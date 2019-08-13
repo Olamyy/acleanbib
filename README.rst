@@ -8,7 +8,7 @@ Usage
 
 Installation
 ------------
-Clone the repository and run ``pip install -e .``
+Clone the repository and run ``python3 script.py [BIBTEX] [--OUTPUT]``
 
 You can then run the tool by calling ``acleanbib [BIBTEX] [--OUTPUT]``
 
