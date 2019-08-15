@@ -17,6 +17,7 @@ Requirements
 1. click
 2. bibtexparser
 3. pandas
+4. tabulate
 
 Licence
 -------
