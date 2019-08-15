@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 import bibtexparser
@@ -7,6 +8,23 @@ from bibtexparser.bparser import BibTexParser
 from bibtexparser.bwriter import BibTexWriter
 from bibtexparser.customization import type as bib_type
 from bibtexparser.customization import author, editor, journal, keyword, link, page_double_hyphen, doi, convert_to_unicode
+from tabulate import tabulate
+
+import logging
+
+logger = logging.getLogger('aclean')
+
+
+class Writer(BibTexWriter):
+    def write(self, bib_database):
+        bibtex = ''
+        for content in self.contents:
+            try:
+                bibtex += getattr(self, '_' + content + '_to_bibtex')(bib_database)
+            except AttributeError:
+                logger.warning("BibTeX item '{}' does not exist and will not be written. Valid items are {}."
+                               .format(content, self._valid_contents))
+        return bibtex
 
 
 def customizations(record):
@@ -22,9 +40,10 @@ def customizations(record):
 
 
 class ACLCleaner(object):
-    def __init__(self, bibtex, output):
+    def __init__(self, bibtex, output, keepkey=True):
         self.bibtex = bibtex
         self.output = output
+        self.keepkey = keepkey
         self.anthology_path = list(Path(os.path.dirname(__file__)).joinpath('data').iterdir())[0]
         self.bibdata = pandas.read_csv(self.anthology_path, compression='zip', low_memory=False)
 
@@ -43,27 +62,26 @@ class ACLCleaner(object):
 
     def clean_output(self, data, bib_id):
         data = data.fillna(' ').astype(str).to_dict(orient='records')
-        data[0]['ID'] = bib_id
-        return data
+        if self.keepkey:
+            data[0]['ID'] = bib_id
+        return data[0]
 
     def match(self, *args):
         title = self.match_title(args[0].get('title'))
         if title.empty or len(title) > 1:
             authors = self.match_authors(args[0].get('author')) if title.empty else self.match_authors(args[0].get('author'), inp=title)
             if authors.empty:
-                print("NO MATCH FOUND FOR {}".format(args[0].get('title')))
-                return args[0]
+                return False, args[0]
             elif len(authors) > 1:
                 date = self.match_date(authors, args[0].get('year'))
                 if date.empty:
-                    print("NO MATCH FOUND FOR {}".format(args[0].get('title')))
-                    return args[0]
+                    return False, args[0]
                 else:
-                    return self.clean_output(date, args[0].get('ID'))
+                    return True, self.clean_output(date, args[0].get('ID'))
             else:
-                return self.clean_output(authors, args[0].get('ID'))
+                return True, self.clean_output(authors, args[0].get('ID'))
         else:
-            return self.clean_output(title, args[0].get('ID'))
+            return True, self.clean_output(title, args[0].get('ID'))
 
     def clean(self):
         with open(self.bibtex) as bibfile:
@@ -74,14 +92,16 @@ class ACLCleaner(object):
         output = list(map(self.match, bibdata.entries))
         out.append(output)
 
+        report = [[i[1].get('title'), i[0]] for i in out[0]]
+        print(tabulate(report, headers=["Paper", "Match Found"], tablefmt="github"))
+
         db = BibDatabase()
+        bibcontent = [i[1] for i in out[0]]
         with open(self.output, 'w') as bibfile:
-            for bib in out[0]:
-                db.entries = bib
-                writer = BibTexWriter()
+            for bib in bibcontent:
+                db.entries = [bib]
+                writer = Writer()
                 writer.indent = '  '
                 writer.align_values = True
                 bibfile.write(writer.write(db))
         return True
-
-

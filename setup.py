@@ -27,7 +27,7 @@ setup(
 
     packages=find_packages(exclude=('tests',)),
 
-    install_requires=['bibtexparser', 'pandas', 'click'],
+    install_requires=['bibtexparser', 'pandas', 'click', 'tabulate'],
 
     entry_points='''
             [console_scripts]
