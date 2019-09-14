@@ -144,7 +144,6 @@ class ACLCleaner(object):
                     cleaned_bib['publisher'] = self.get_publish()
                     to_remove = ["abstracts"]
                     cleaned_bib = {k: v for k, v in cleaned_bib.items() if k not in to_remove}
-                print(cleaned_bib)
                 db.entries = [cleaned_bib]
                 writer = Writer()
                 writer.order_entries_by = ('ID', 'title', 'author', 'booktitle', 'month', 'year', 'address', 'publisher', 'url', 'pages')
