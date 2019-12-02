@@ -1,5 +1,5 @@
+PyYAML
 tabulate
 click
 pandas
 bibtexparser
-tabulate

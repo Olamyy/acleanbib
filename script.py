@@ -5,19 +5,22 @@ from cleaner import ACLCleaner
 
 
 @click.command()
-@click.argument('bibtex', type=click.Path())
-@click.option('--output', type=click.Path())
+@click.argument('bibtex', type=click.Path(), required=False)
+@click.argument('output', type=click.Path(), required=False)
 @click.option('--keepkey', type=click.INT, default=1, help='Keep current key')
-@click.option('--concise', type=click.INT, default=1, help='Do deep cleaning.')
-@click.option('--show_output', type=click.INT, default=0, help="Show cleaning report in a table")
-@click.option('--write_to_file', type=click.INT, default=0, help="Write output to file")
-def aclbibcleaner(bibtex, output, keepkey, concise, show_output, write_to_file):
+@click.option('--concise/--not-concise', default=False, help='Do deep cleaning')
+@click.option('--keepkey/--replace-key', default=False, help='Keep Key')
+@click.option('--verbose', '-v/-q', default=False, help="Verbose Logging")
+def aclbibcleaner(bibtex, output, keepkey, concise, verbose):
     output = output if output else "cleaned_bib.bib"
-    cleaner = ACLCleaner(bibtex, output, keepkey, concise=concise, show_output=show_output, write_to_file=write_to_file)
-    return cleaner.clean()
+    try:
+        cleaner = ACLCleaner(bibtex, output, keepkey, concise=concise, verbose=verbose, stream=False)
+        return cleaner.clean()
+    except TypeError:
+        bibtex = click.get_text_stream('stdin').read()
+        cleaner = ACLCleaner(bibtex, output, keepkey, concise=concise, verbose=verbose, stream=True)
+        return cleaner.clean()
 
 
 if __name__ == '__main__':
     aclbibcleaner()
-
-

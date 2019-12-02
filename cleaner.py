@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import io
 import bibtexparser
 import pandas
 import yaml
@@ -8,10 +9,9 @@ from bibtexparser.bparser import BibTexParser
 from bibtexparser.bwriter import BibTexWriter
 from bibtexparser.customization import type as bib_type
 from bibtexparser.customization import author, editor, journal, keyword, link, page_double_hyphen, doi, convert_to_unicode
-from tabulate import tabulate
 import logging
 
-logger = logging.getLogger('aclean')
+logging.getLogger().setLevel(logging.INFO)
 
 
 def _str_or_expr_to_bibtex(e):
@@ -74,13 +74,13 @@ def customizations(record):
 
 
 class ACLCleaner(object):
-    def __init__(self, bibtex, output, keepkey=True, show_output=False, concise=False, write_to_file=False):
+    def __init__(self, bibtex, output, keepkey=False, verbose=True, concise=False, stream=False,):
         self.bibtex = bibtex
         self.output = output
         self.keepkey = keepkey
-        self.show_ouput = show_output
+        self.verbose = verbose
         self.concise = concise
-        self.write_to_file = write_to_file
+        self.stream = stream
         self.anthology_path = list(Path(os.path.dirname(__file__)).joinpath('data').iterdir())[1]
         self.venues_path = list(Path(os.path.dirname(__file__)).joinpath('data').iterdir())[0]
         self.bibdata = pandas.read_csv(self.anthology_path, compression='zip', low_memory=False)
@@ -98,65 +98,68 @@ class ACLCleaner(object):
         m = inp[inp['year'] == int(year)]
         return m
 
-    def clean_output(self, data, bib_id):
+    def clean_output(self, data, bib_id, status):
         data = data.fillna(' ').astype(str).to_dict(orient='records')
+        if self.verbose:
+            if status:
+                logging.info("Matched key {} to Anthology paper ID {}".format(bib_id, data[0].get('ID')))
+            else:
+                logging.info("Could not match key {}.".format(data[0].get('ID')))
         if self.keepkey:
             data[0]['ID'] = bib_id
         return data[0]
 
     def match(self, *args):
-        title = self.match_title(args[0].get('title'))
-        if title.empty or len(title) > 1:
-            authors = self.match_authors(args[0].get('author')) if title.empty else self.match_authors(args[0].get('author'), inp=title)
-            if authors.empty:
-                return False, args[0]
-            elif len(authors) > 1:
-                date = self.match_date(authors, args[0].get('year'))
-                if date.empty:
-                    return False, args[0]
+        title_df = self.match_title(args[0].get('title'))
+        if title_df.empty or len(title_df) > 1:
+            authors_df = self.match_authors(args[0].get('author')) if title_df.empty else self.match_authors(args[0].get('author'), inp=title_df)
+            if authors_df.empty:
+                if self.verbose:
+                    logging.info("Could not match key {}.".format(args[0].get('ID')))
+                return args[0]
+            elif len(authors_df) > 1:
+                date_df = self.match_date(authors_df, args[0].get('year'))
+                if date_df.empty:
+                    if self.verbose:
+                        logging.info("Could not match key {}.".format(args[0].get('ID')))
+                    return args[0]
                 else:
-                    return True, self.clean_output(date, args[0].get('ID'))
+                    return self.clean_output(date_df, args[0].get('ID'), True)
             else:
-                return True, self.clean_output(authors, args[0].get('ID'))
+                return self.clean_output(authors_df, args[0].get('ID'), True)
         else:
-            return True, self.clean_output(title, args[0].get('ID'))
+            return self.clean_output(title_df, args[0].get('ID'), True)
 
     def clean(self):
-        with open(self.bibtex) as bibfile:
-            parser = BibTexParser(common_strings=True)
-            parser.customization = convert_to_unicode
-            bibdata = bibtexparser.load(bibfile, parser=parser)
-        out = []
+        bibstream = open(self.bibtex) if not self.stream else io.StringIO(self.bibtex)
+        parser = BibTexParser(common_strings=True)
+        parser.customization = convert_to_unicode
+        bibdata = bibtexparser.load(bibstream, parser=parser)
         output = list(map(self.match, bibdata.entries))
-        out.append(output)
-
-        if self.show_ouput:
-            report = [[i[1].get('title'), i[0]] for i in out[0]]
-            print(tabulate(report, headers=["Paper", "Match Found"], tablefmt="github"))
 
         db = BibDatabase()
-        bibcontent = [i[1] for i in out[0]]
-        with open(self.output, 'w') as bibfile:
-            for bib in bibcontent:
-                cleaned_bib = {k: v for k, v in bib.items() if len(v) != 1}
+        bibcontent = [i for i in output]
 
-                if self.concise:
-                    cleaned_bib['publisher'] = self.get_publish()
-                    to_remove = ["abstracts"]
-                    cleaned_bib = {k: v for k, v in cleaned_bib.items() if k not in to_remove}
-                db.entries = [cleaned_bib]
-                writer = Writer()
-                writer.order_entries_by = ('ID', 'title', 'author', 'booktitle', 'month', 'year', 'address', 'publisher', 'url', 'pages')
-                writer.indent = '  '
-                writer.align_values = True
-                if self.write_to_file:
+        for bib in bibcontent:
+            cleaned_bib = {k: v.replace('\n', '') for k, v in bib.items() if len(v) != 1}
+
+            if self.concise:
+                cleaned_bib['publisher'] = self.get_publish()
+                to_remove = ["abstracts"]
+                cleaned_bib = {k: v for k, v in cleaned_bib.items() if k not in to_remove}
+            db.entries = [cleaned_bib]
+            writer = Writer()
+            writer.order_entries_by = ('ID', 'title', 'author', 'booktitle', 'month', 'year', 'address', 'publisher', 'url', 'pages')
+            writer.indent = '  '
+            writer.align_values = True
+            if Path(self.output).exists():
+                with open(self.output, 'w') as bibfile:
                     bibfile.write(writer.write(db))
-                else:
-                    print(writer.write(db))
+            else:
+                print(writer.write(db))
         return True
 
     def get_publish(self):
         with open(self.venues_path, 'r') as f:
             venues = yaml.load(f)
         return True
-
